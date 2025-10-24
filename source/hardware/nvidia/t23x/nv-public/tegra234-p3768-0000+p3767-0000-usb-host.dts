@@ -1,0 +1,6 @@
+#include "tegra234-p3768-0000+p3767-0000.dts"
+
+&usb_recovery {
+    mode = "host";
+    /delete-property/ usb-role-switch;
+};
