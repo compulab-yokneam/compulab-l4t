@@ -23,7 +23,13 @@ prevent_bootloader_update() {
     mkdir -p $(dirname ${key_file}) && touch ${key_file}
 }
 
+update_systen_service() {
+    [[ -f lib/systemd/system/${sys_service} ]] || return 0
+    systemctl enable ${sys_service}
+}
+
 nv-update-initrd
 update_boot_files
 update_boot_config
 prevent_bootloader_update
+sys_service="fdt-update.service" update_systen_service

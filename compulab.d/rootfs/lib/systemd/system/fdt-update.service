@@ -1,0 +1,10 @@
+[Unit]
+Description=FDT Update Service
+ConditionPathExists=/opt/compulab/fdt.sh
+
+[Service]
+Type=oneshot
+ExecStart=/opt/compulab/fdt.sh
+
+[Install]
+WantedBy=default.target
