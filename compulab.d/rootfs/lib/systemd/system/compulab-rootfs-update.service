@@ -1,0 +1,10 @@
+[Unit]
+Description=CompuLab Rootfs Update Service
+ConditionPathExists=/opt/compulab/rootfs_update.sh
+
+[Service]
+Type=oneshot
+ExecStart=/opt/compulab/rootfs_update.sh
+
+[Install]
+WantedBy=default.target
