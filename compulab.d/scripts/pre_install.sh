@@ -7,7 +7,7 @@ update_soc_info() {
     sed -i 's/<SOC>/t234/g' ${nvidia_source}
 }
 
-prevent_bootloader_update() {
+prevent_fw_update() {
     local key_file="/opt/nvidia/l4t-packages/.nv-l4t-disable-boot-fw-update-in-preinstall"
     mkdir -p $(dirname ${key_file}) && touch ${key_file}
 }
@@ -20,5 +20,5 @@ rootfs_update() {
 }
 
 update_soc_info
-prevent_bootloader_update
+prevent_fw_update
 rootfs_update
