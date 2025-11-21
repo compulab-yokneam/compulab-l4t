@@ -1,35 +1,39 @@
 #!/bin/bash -x
 
-VERSION=${1}
+export COMPULAB_VERSION=${1}
+export NVIDIA_VERSION=${2:-$COMPULAB_VERSION}
+export SYS_SERVICE_LIST=${3:-"empty-service-name,"}
+
+_update_boot_files() {
+    mkdir /boot/compulab/backup -p
+    cp /boot/initrd /boot/compulab/initrd-${COMPULAB_VERSION}
+    cp /boot/Image /boot/compulab/Image-${COMPULAB_VERSION}
+    cp /boot/initrd /boot/compulab/backup/initrd-${COMPULAB_VERSION}
+    cp /boot/Image /boot/compulab/backup/Image-${COMPULAB_VERSION}
+}
+
+_update_boot_config_kernel() {
+    sed -i "s/\(^ .*LINUX \).*$/\1\/boot\/compulab\/Image-${COMPULAB_VERSION}/g"   /boot/extlinux/extlinux.conf
+    sed -i "s/\(^ .*INITRD \).*$/\1\/boot\/compulab\/initrd-${COMPULAB_VERSION}/g" /boot/extlinux/extlinux.conf
+}
 
 update_boot_files() {
-    mkdir /boot/compulab/backup -p
-    cp /boot/initrd /boot/compulab/initrd-${VERSION}
-    cp /boot/Image /boot/compulab/Image-${VERSION}
-    cp /boot/initrd /boot/compulab/backup/initrd-${VERSION}
-    cp /boot/Image /boot/compulab/backup/Image-${VERSION}
+    _update_boot_files
+    _update_boot_config_kernel
 }
 
-update_boot_config() {
-    sed -i "s/\(^ .*LINUX \).*$/\1\/boot\/compulab\/Image-${VERSION}/g"   /boot/extlinux/extlinux.conf
-    sed -i "s/\(^ .*INITRD \).*$/\1\/boot\/compulab\/initrd-${VERSION}/g" /boot/extlinux/extlinux.conf
+update_boot_config_bootargs() {
     sed -i "s/\(^. *APPEND \${cbootargs}\).*/\1 net.ifnames=0/g"          /boot/extlinux/extlinux.conf
-    # sed -i "/FDT/d" /boot/extlinux/extlinux.conf
-    # sed -i "/initrd-${VERSION}/a\      FDT /boot/dtbs/tegra234-p3768-0000+p3767-0000-nv-super-device.dtb" /boot/extlinux/extlinux.conf
 }
 
-prevent_bootloader_update() {
-    local key_file="/opt/nvidia/l4t-packages/.nv-l4t-disable-boot-fw-update-in-preinstall"
-    mkdir -p $(dirname ${key_file}) && touch ${key_file}
-}
-
-update_systen_service() {
-    [[ -f lib/systemd/system/${sys_service} ]] || return 0
-    systemctl enable ${sys_service}
+update_system_services() {
+    local sys_service_list="${SYS_SERVICE_LIST//,/ }"
+    for _service in ${sys_service_list};do
+        [[ -f /lib/systemd/system/${_service}.service ]] && systemctl enable ${_service} || true
+    done
 }
 
 nv-update-initrd
-update_boot_files
-update_boot_config
-prevent_bootloader_update
-sys_service="fdt-update.service" update_systen_service
+[[ "${COMPULAB_VERSION}" = "${NVIDIA_VERSION}" ]] || update_boot_files
+update_boot_config_bootargs
+update_system_services
