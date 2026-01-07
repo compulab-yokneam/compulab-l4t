@@ -1,0 +1,23 @@
+#!/bin/bash
+
+PROG_DIR=$(readlink -e $(dirname ${BASH_SOURCE[0]}))
+TOOLS=${PROG_DIR}/tools
+
+source ${TOOLS}/clog.inc
+source ${TOOLS}/clerp.inc
+
+COMMAND=${1:-""}
+SERIAL=${2:-""}
+VALUE=${3:-""}
+
+[ -n ${COMMAND:-""} ] || exit 22
+
+command -v ${COMMAND} &>/dev/null && ${COMMAND} ${SERIAL} ${VALUE}
+
+[[ ${COMMAND} = "get_config" ]] && {
+cat << eof
+export PRODUCT=${PRODUCT}
+export CONFIG=${CONFIG}
+export REVISION=${REVISION}
+eof
+};
