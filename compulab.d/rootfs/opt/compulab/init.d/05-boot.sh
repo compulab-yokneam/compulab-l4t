@@ -1,15 +1,17 @@
 #!/bin/bash 
 
 extlinux=/boot/extlinux/extlinux.conf
-BR=$(awk '(/TNSPEC/)&&($0=$2)' /etc/nv_boot_control.conf)
-BR=(${BR//-/ })
-BR=${BR[2]}
+export SOM_EEPROM_I2C_ADDR=50
+export SOM_EEPROM_I2C_BUS=0
+export SOM_EEPROM_DEV=/sys/bus/i2c/devices/${SOM_EEPROM_I2C_BUS}-00${SOM_EEPROM_I2C_ADDR}/eeprom
+BR=$(dd if=${SOM_EEPROM_DEV} skip=$((0x1E)) bs=1 count=4 2>/dev/null)
 FDT="/boot/dtbs/tegra234-p3768-0000+p3767-${BR}-nv-super-host.dtb"
 
 main_reboot() {
 cat << eof | tee /dev/kmsg
     Maintenace reboot ...
 eof
+ischroot && { chroot_exit; return 0; }
 for _c in s u b;do
     echo ${_c} > /proc/sysrq-trigger
 done
@@ -50,7 +52,6 @@ return 0
 }
 
 fdt_main() {
-    ischroot && { chroot_exit; return 0; }
     [[ -f ${FDT} ]] || { bad_case; return 0; }
     FDT_SHORT=$(basename ${FDT})
     grep -q ${FDT_SHORT} ${extlinux} && { empty_case; return 0; } || true
