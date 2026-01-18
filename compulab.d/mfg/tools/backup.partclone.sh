@@ -1,12 +1,13 @@
 #!/bin/bash -e
 
-uid=$(id -u)
-[[ ${uid} -eq 0 ]] || exit -13
+[[ -z ${debug:-""} ]] || set -x
+[[ $(id -u) -eq 0 ]] || exit -13
 
 [[ -n ${device:-""} ]] || exit 2
 [[ -b ${device:-""} ]] || exit 3
 
 function backup_partclone_func() {
+
     sfdisk --dump ${device} | awk '!/last-lba|^device:/' > disk.layout
     sfdisk --disk-id ${device} > disk.id
     declare -A pc_options=( ['ext4']="-c" ['vfat']="-c" )
