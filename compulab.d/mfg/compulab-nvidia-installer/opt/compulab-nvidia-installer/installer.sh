@@ -2,10 +2,11 @@
 
 work_dir=$(readlink -e $(dirname ${BASH_SOURCE[0]}))
 tools_dir=${work_dir}/tools
-src_dir=${work_dir}/images.d/nvidia-swap-storage
-layout_dir=${work_dir}/images.d/layouts.d
+src_dir=${work_dir}/data/images.d/01
 
 source ${work_dir}/installer.env
+source ${work_dir}/installer.inc
+source ${work_dir}/installer.lay
 
 choose_device_func() {
 	local select_string=$(get_install_devices)" Exit"
@@ -43,33 +44,37 @@ eof
 	fi
 }
 
+
 installer_func() {
 	local select_string=""
-	for l in ${layout_dir}/* ;do 
-		layout_id=$(basename ${l})
-		layout_string=$(sed "s/ /__/g" ${l}/desk.layout)
+	local layout=""
+
+	for _layout in $(for __layout in ${!layout_array[@]};do echo ${__layout}; done | sort -u);do
+		layout_id=${_layout}
+		layout_string=$(sed "s/ /__/g" <<< ${layout_array[${_layout}]})
 		select_string+="${layout_id}--[${layout_string}]  "
 	done
 	select_string+="99--[Unsupported_Layout] Exit"
 	PS3="Choose layout > "
-	local LAYOUT=""
-	while [ -z ${LAYOUT:-""} ];do
+	while [ -z ${layout:-""} ];do
 		select j in ${select_string}; do
 			case ${j} in
 				"Exit")
 				exit 0
 				;;
 				*)
-				LAYOUT=${j:0:2}
+				layout=${j}
 				break
 				;;
 			esac
 		done
 	done
 
-	[[ -f  ${layout_dir}/${LAYOUT}/func.layout ]] || { echo "Bad case, exiting.." ; exit 22; }
-	source ${layout_dir}/${LAYOUT}/func.layout
+	# Get the layout func from the select string
+	layout=(${layout/--/ })
+	layout=${layout[0]}
 
+	${layout}
 	inst_init
 	src=${src_dir} device=${device} ${tools_dir}/restore.partclone.sh
 	inst_fini
