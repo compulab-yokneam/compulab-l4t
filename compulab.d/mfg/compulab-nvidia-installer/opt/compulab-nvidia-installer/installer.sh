@@ -54,7 +54,7 @@ installer_func() {
 		layout_string=$(sed "s/ /__/g" <<< ${layout_array[${_layout}]})
 		select_string+="${layout_id}--[${layout_string}]  "
 	done
-	select_string+="99--[Unsupported_Layout] Exit"
+	select_string+=" Exit"
 	PS3="Choose layout > "
 	while [ -z ${layout:-""} ];do
 		select j in ${select_string}; do
