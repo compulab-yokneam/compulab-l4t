@@ -10,9 +10,8 @@ layout_01() {
 	_APP_SIZE=0
 }
 
-layout_array["layout_02"]="02_Nvidia Layout; rootfs=128GiB, swap=16GiB, data partition till the end of the media"
-layout_02() {
-	_APP_SIZE=128
+_layout_with_size() {
+	_APP_SIZE=${app_size}
 	_update_layout() {
 		wait 1
 		add_swap
@@ -24,18 +23,40 @@ layout_02() {
 	}
 }
 
+layout_array["layout_02"]="02_Nvidia Layout; rootfs=<user_defined_>GiB, swap=16GiB, data partition till the end of the media"
+layout_02() {
+	local select_string="32 64 128 Exit"
+	local app_size=""
+	PS3="Choose rootfs size > "
+	while [ -z ${app_size:-""} ];do
+		select j in ${select_string}; do
+			case ${j} in
+				"Exit")
+				exit 0
+				;;
+				*)
+				app_size=${j}
+				break
+				;;
+			esac
+		done
+	done
+	app_size=${app_size} _layout_with_size
+}
+
 apply_layout() {
 	local REAL_SIZE=$(( ${_APP_SIZE}  << 21 ))
 	[[ ${REAL_SIZE} -eq 0 ]] && REAL_SIZE=""
 	sed "s/@@SIZE@@/${REAL_SIZE}/g" ${_DISK_LAYOUT} | tee ${WORKING_LAYOUT}
-	sed "s/@@SIZE@@/${REAL_SIZE}/g" ${_DISK_LAYOUT} | sfdisk ${device}
-	wait 2
 }
-
 
 WORKING_LAYOUT=/tmp/disk.layout
 
 inst_init() {
+	# Umount the file; it could be mounted; after a failed run
+	while [ 1 ];do
+		umount ${src_dir}/disk.layout &>/dev/null || break
+	done
 	apply_layout
 	mount -B ${WORKING_LAYOUT} ${src_dir}/disk.layout
 }
