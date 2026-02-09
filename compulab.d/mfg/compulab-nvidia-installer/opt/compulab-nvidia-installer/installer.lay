@@ -5,7 +5,7 @@ _DISK_LAYOUT=${src_dir}/disk.layout
 _APP_SIZE=0
 declare -A layout_array
 
-layout_array["layout_01"]="01_Nvidia Layout; rootfs till the end of the media"
+layout_array["layout_01"]="01_Nvidia Layout (DEFAULT); rootfs till the end of the media"
 layout_01() {
 	_APP_SIZE=0
 }
@@ -63,7 +63,7 @@ inst_init() {
 
 # After APP
 add_swap() {
-	local after=${after:-"APP"}
+	local after=${after:-"ROOTFS"}
 	local part_size_gb=${part_size_gb:-16}
 	local part=$(get_partition_by_name ${after})
 	[[ -n ${part:-""} ]] || return 22
@@ -92,10 +92,10 @@ add_ext4() {
 
 data_part_name="storage"
 
-inst_fini() {
+_inst_fini1() {
 	command -v _update_layout >/dev/null &&  _update_layout
 	umount ${src_dir}/disk.layout
-	local rootfs_partition=$(get_partition_by_name "APP")
+	local rootfs_partition=$(get_partition_by_name "ROOTFS")
 	[[ -n ${rootfs_partition:-""} ]] || return 22
 	# part=${rootfs_partition} expand_partition
 
@@ -123,4 +123,38 @@ inst_fini() {
 	done
 	umount ${rootfs_partition}
 	rm -rf ${rootfs_mpoint}
+}
+
+_extlinux_update() {
+	mount -B /dev ${rootfs_mpoint}/dev/
+	mount -B /dev/pts ${rootfs_mpoint}/dev/pts
+	mount -B /sys ${rootfs_mpoint}/sys
+	mount -B /proc ${rootfs_mpoint}/proc
+	chroot ${rootfs_mpoint} /opt/compulab/init.d/05-boot.sh
+	umount ${rootfs_mpoint}/proc ${rootfs_mpoint}/sys ${rootfs_mpoint}/dev/pts ${rootfs_mpoint}/dev
+}
+
+_inst_fini0() {
+	local rootfs_part=$(get_partition_by_name ROOTFS)
+	local rootfs_mpoint=$(mktemp --directory)
+	mount ${rootfs_part} ${rootfs_mpoint}
+
+	# Update boot configuration on the original rootfs
+	rootfs_mpoint=${rootfs_mpoint} _extlinux_update
+
+	# Prepare APP partition for boot files only
+	local app_part=$(get_partition_by_name APP)
+	local app_mpoint=$(mktemp --directory)
+	mkfs.ext4 -FL APP ${app_part}
+	mount ${app_part} ${app_mpoint}
+
+	# Copy rootfs/boot to <boot-partition>/
+	cp -a ${rootfs_mpoint}/boot ${app_mpoint}/
+	umount ${app_mpoint} ${rootfs_mpoint}
+}
+
+inst_fini() {
+	_inst_fini0
+	_inst_fini1
+
 }
