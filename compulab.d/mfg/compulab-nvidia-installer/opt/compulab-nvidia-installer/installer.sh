@@ -3,6 +3,7 @@
 work_dir=$(readlink -e $(dirname ${BASH_SOURCE[0]}))
 tools_dir=${work_dir}/tools
 src_dir=${work_dir}/data/images.d/01
+rootfs_dir=${work_dir}/data/rootfs.d
 
 source ${work_dir}/installer.env
 source ${work_dir}/installer.inc
