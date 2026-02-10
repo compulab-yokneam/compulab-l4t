@@ -75,3 +75,16 @@ get_install_devices() {
 	done
 	echo ${install_devs}
 }
+
+issue_chroot() {
+	[[ -n ${rootfs_mpoint:-""} ]] || return 22
+	[[ -d ${rootfs_mpoint:-""} ]] || return 22
+	chroot_cmd=${chroot_cmd:-""}
+	mount -B /dev ${rootfs_mpoint}/dev/
+	mount -B /dev/pts ${rootfs_mpoint}/dev/pts
+	mount -B /sys ${rootfs_mpoint}/sys
+	mount -B /proc ${rootfs_mpoint}/proc
+	mount -B /etc/resolv.conf ${rootfs_mpoint}/etc/resolv.conf
+	chroot ${rootfs_mpoint} "${chroot_cmd}"
+	umount ${rootfs_mpoint}/etc/resolv.conf ${rootfs_mpoint}/proc ${rootfs_mpoint}/sys ${rootfs_mpoint}/dev/pts ${rootfs_mpoint}/dev
+}
