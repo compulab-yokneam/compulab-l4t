@@ -7,154 +7,154 @@ declare -A layout_array
 
 layout_array["layout_01"]="01_Nvidia Layout (DEFAULT); rootfs till the end of the media"
 layout_01() {
-	_APP_SIZE=0
+    _APP_SIZE=0
 }
 
 _layout_with_size() {
-	_APP_SIZE=${app_size}
-	_update_layout() {
-		wait 1
-		add_swap
-		wait 1
-		part_label=${data_part_name} add_ext4
-		wait 1
-		partprobe ${device}
-		wait 1
-	}
+    _APP_SIZE=${app_size}
+    _update_layout() {
+        wait 1
+        add_swap
+        wait 1
+        part_label=${data_part_name} add_ext4
+        wait 1
+        partprobe ${device}
+        wait 1
+    }
 }
 
 layout_array["layout_02"]="02_Nvidia Layout; rootfs=<user_defined_>GiB, swap=16GiB, data partition till the end of the media"
 layout_02() {
-	local select_string="32 64 128 Exit"
-	local app_size=""
-	PS3="Choose rootfs size > "
-	while [ -z ${app_size:-""} ];do
-		select j in ${select_string}; do
-			case ${j} in
-				"Exit")
-				exit 0
-				;;
-				*)
-				app_size=${j}
-				break
-				;;
-			esac
-		done
-	done
-	app_size=${app_size} _layout_with_size
+    local select_string="32 64 128 Exit"
+    local app_size=""
+    PS3="Choose rootfs size > "
+    while [ -z ${app_size:-""} ];do
+        select j in ${select_string}; do
+            case ${j} in
+                "Exit")
+                exit 0
+                ;;
+                *)
+                app_size=${j}
+                break
+                ;;
+            esac
+        done
+    done
+    app_size=${app_size} _layout_with_size
 }
 
 apply_layout() {
-	local REAL_SIZE=$(( ${_APP_SIZE}  << 21 ))
-	[[ ${REAL_SIZE} -eq 0 ]] && REAL_SIZE=""
-	sed "s/@@SIZE@@/${REAL_SIZE}/g" ${_DISK_LAYOUT} | tee ${WORKING_LAYOUT}
+    local REAL_SIZE=$(( ${_APP_SIZE}  << 21 ))
+    [[ ${REAL_SIZE} -eq 0 ]] && REAL_SIZE=""
+    sed "s/@@SIZE@@/${REAL_SIZE}/g" ${_DISK_LAYOUT} | tee ${WORKING_LAYOUT}
 }
 
 WORKING_LAYOUT=/tmp/disk.layout
 
 inst_init() {
-	# Umount the file; it could be mounted; after a failed run
-	while [ 1 ];do
-		umount ${src_dir}/disk.layout &>/dev/null || break
-	done
-	apply_layout
-	mount -B ${WORKING_LAYOUT} ${src_dir}/disk.layout
+    # Umount the file; it could be mounted; after a failed run
+    while [ 1 ];do
+        umount ${src_dir}/disk.layout &>/dev/null || break
+    done
+    apply_layout
+    mount -B ${WORKING_LAYOUT} ${src_dir}/disk.layout
 }
 
 # After APP
 add_swap() {
-	local after=${after:-"ROOTFS"}
-	local part_size_gb=${part_size_gb:-16}
-	local part=$(get_partition_by_name ${after})
-	[[ -n ${part:-""} ]] || return 22
-	part=$(basename ${part})
-	local edge_block=$(( $(cat /sys/class/block/${part}/start) + $(cat /sys/class/block/${part}/size) ))
-	# roud up
-	local part_start_mb=$(( $(( $(( $(( ${edge_block} >> 11 )) + 4 )) / 4 )) * 4 )) 
-	local part_stop_mb=$(( ${part_start_mb} + $(( ${part_size_gb} << 10 )) ))
-	echo "mkpart swap linux-swap ${part_start_mb}MiB ${part_stop_mb}MiB" | parted ${device}
+    local after=${after:-"ROOTFS"}
+    local part_size_gb=${part_size_gb:-16}
+    local part=$(get_partition_by_name ${after})
+    [[ -n ${part:-""} ]] || return 22
+    part=$(basename ${part})
+    local edge_block=$(( $(cat /sys/class/block/${part}/start) + $(cat /sys/class/block/${part}/size) ))
+    # roud up
+    local part_start_mb=$(( $(( $(( $(( ${edge_block} >> 11 )) + 4 )) / 4 )) * 4 ))
+    local part_stop_mb=$(( ${part_start_mb} + $(( ${part_size_gb} << 10 )) ))
+    echo "mkpart swap linux-swap ${part_start_mb}MiB ${part_stop_mb}MiB" | parted ${device}
 }
 
 # After swap
 add_ext4() {
-	local after=${after:-"swap"}
-	local part_size_gb=${part_size_gb:-16}
-	local part_label=${part_label:-"part_label"}
-	local part=$(get_partition_by_name ${after})
-	[[ -n ${part:-""} ]] || return 22
-	part=$(basename ${part})
-	local edge_block=$(( $(cat /sys/class/block/${part}/start) + $(cat /sys/class/block/${part}/size) ))
-	# roud up
-	local part_start_mb=$(( $(( $(( $(( ${edge_block} >> 11 )) + 4 )) / 4 )) * 4 )) 
-	local part_stop_mb=$(( ${part_start_mb} + $(( ${part_size_gb} << 10 )) ))
-	echo "mkpart ${part_label} ext4 ${part_start_mb}MiB ${part_stop_mb}MiB" | parted ${device}
+    local after=${after:-"swap"}
+    local part_size_gb=${part_size_gb:-16}
+    local part_label=${part_label:-"part_label"}
+    local part=$(get_partition_by_name ${after})
+    [[ -n ${part:-""} ]] || return 22
+    part=$(basename ${part})
+    local edge_block=$(( $(cat /sys/class/block/${part}/start) + $(cat /sys/class/block/${part}/size) ))
+    # roud up
+    local part_start_mb=$(( $(( $(( $(( ${edge_block} >> 11 )) + 4 )) / 4 )) * 4 ))
+    local part_stop_mb=$(( ${part_start_mb} + $(( ${part_size_gb} << 10 )) ))
+    echo "mkpart ${part_label} ext4 ${part_start_mb}MiB ${part_stop_mb}MiB" | parted ${device}
 }
 
 data_part_name="storage"
 
 _inst_fini1() {
-	command -v _update_layout >/dev/null &&  _update_layout
-	umount ${src_dir}/disk.layout
-	local rootfs_partition=$(get_partition_by_name "ROOTFS")
-	[[ -n ${rootfs_partition:-""} ]] || return 22
-	# part=${rootfs_partition} expand_partition
+    command -v _update_layout >/dev/null &&  _update_layout
+    umount ${src_dir}/disk.layout
+    local rootfs_partition=$(get_partition_by_name "ROOTFS")
+    [[ -n ${rootfs_partition:-""} ]] || return 22
+    # part=${rootfs_partition} expand_partition
 
-	declare -A fstab_array
-	local swap_partition=$(get_partition_by_name "swap")
-	if [[ -n ${swap_partition:-""} ]];then
-		mkswap ${swap_partition}
-		fstab_array["swap"]="/dev/disk/by-partlabel/swap none swap sw 0 0"
-	fi
+    declare -A fstab_array
+    local swap_partition=$(get_partition_by_name "swap")
+    if [[ -n ${swap_partition:-""} ]];then
+        mkswap ${swap_partition}
+        fstab_array["swap"]="/dev/disk/by-partlabel/swap none swap sw 0 0"
+    fi
 
-	local storage_partition=$(get_partition_by_name ${data_part_name})
-	if [[ -n ${storage_partition:-""} ]];then
-		mkfs.ext4 -F -L ${data_part_name} ${storage_partition}
-		part=${storage_partition} expand_partition
-		fstab_array[${data_part_name}]="/dev/disk/by-partlabel/${data_part_name} /${data_part_name} ext4 defaults 0 0"
-	fi
+    local storage_partition=$(get_partition_by_name ${data_part_name})
+    if [[ -n ${storage_partition:-""} ]];then
+        mkfs.ext4 -F -L ${data_part_name} ${storage_partition}
+        part=${storage_partition} expand_partition
+        fstab_array[${data_part_name}]="/dev/disk/by-partlabel/${data_part_name} /${data_part_name} ext4 defaults 0 0"
+    fi
 
-	# Update fstab if required
-	[[ ${#fstab_array[@]} -eq 0 ]] && return 0
+    # Update fstab if required
+    [[ ${#fstab_array[@]} -eq 0 ]] && return 0
 
-	local rootfs_mpoint=$(mktemp --directory)
-	mount ${rootfs_partition} ${rootfs_mpoint}
-	for _fstab in ${!fstab_array[@]};do
-		echo ${fstab_array[${_fstab}]} | tee &>/dev/null -a ${rootfs_mpoint}/etc/fstab
-	done
-	umount ${rootfs_partition}
-	rm -rf ${rootfs_mpoint}
+    local rootfs_mpoint=$(mktemp --directory)
+    mount ${rootfs_partition} ${rootfs_mpoint}
+    for _fstab in ${!fstab_array[@]};do
+        echo ${fstab_array[${_fstab}]} | tee &>/dev/null -a ${rootfs_mpoint}/etc/fstab
+    done
+    umount ${rootfs_partition}
+    rm -rf ${rootfs_mpoint}
 }
 
 _extlinux_update() {
-	mount -B /dev ${rootfs_mpoint}/dev/
-	mount -B /dev/pts ${rootfs_mpoint}/dev/pts
-	mount -B /sys ${rootfs_mpoint}/sys
-	mount -B /proc ${rootfs_mpoint}/proc
-	chroot ${rootfs_mpoint} /opt/compulab/init.d/05-boot.sh
-	umount ${rootfs_mpoint}/proc ${rootfs_mpoint}/sys ${rootfs_mpoint}/dev/pts ${rootfs_mpoint}/dev
+    mount -B /dev ${rootfs_mpoint}/dev/
+    mount -B /dev/pts ${rootfs_mpoint}/dev/pts
+    mount -B /sys ${rootfs_mpoint}/sys
+    mount -B /proc ${rootfs_mpoint}/proc
+    chroot ${rootfs_mpoint} /opt/compulab/init.d/05-boot.sh
+    umount ${rootfs_mpoint}/proc ${rootfs_mpoint}/sys ${rootfs_mpoint}/dev/pts ${rootfs_mpoint}/dev
 }
 
 _inst_fini0() {
-	local rootfs_part=$(get_partition_by_name ROOTFS)
-	local rootfs_mpoint=$(mktemp --directory)
-	mount ${rootfs_part} ${rootfs_mpoint}
+    local rootfs_part=$(get_partition_by_name ROOTFS)
+    local rootfs_mpoint=$(mktemp --directory)
+    mount ${rootfs_part} ${rootfs_mpoint}
 
-	# Update boot configuration on the original rootfs
-	rootfs_mpoint=${rootfs_mpoint} _extlinux_update
+    # Update boot configuration on the original rootfs
+    rootfs_mpoint=${rootfs_mpoint} _extlinux_update
 
-	# Prepare APP partition for boot files only
-	local app_part=$(get_partition_by_name APP)
-	local app_mpoint=$(mktemp --directory)
-	mkfs.ext4 -FL APP ${app_part}
-	mount ${app_part} ${app_mpoint}
+    # Prepare APP partition for boot files only
+    local app_part=$(get_partition_by_name APP)
+    local app_mpoint=$(mktemp --directory)
+    mkfs.ext4 -FL APP ${app_part}
+    mount ${app_part} ${app_mpoint}
 
-	# Copy rootfs/boot to <boot-partition>/
-	cp -a ${rootfs_mpoint}/boot ${app_mpoint}/
-	umount ${app_mpoint} ${rootfs_mpoint}
+    # Copy rootfs/boot to <boot-partition>/
+    cp -a ${rootfs_mpoint}/boot ${app_mpoint}/
+    umount ${app_mpoint} ${rootfs_mpoint}
 }
 
 inst_fini() {
-	_inst_fini0
-	_inst_fini1
+    _inst_fini0
+    _inst_fini1
 
 }
