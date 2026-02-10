@@ -126,21 +126,106 @@ _inst_fini1() {
 }
 
 _extlinux_update() {
-    mount -B /dev ${rootfs_mpoint}/dev/
-    mount -B /dev/pts ${rootfs_mpoint}/dev/pts
-    mount -B /sys ${rootfs_mpoint}/sys
-    mount -B /proc ${rootfs_mpoint}/proc
-    chroot ${rootfs_mpoint} /opt/compulab/init.d/05-boot.sh
-    umount ${rootfs_mpoint}/proc ${rootfs_mpoint}/sys ${rootfs_mpoint}/dev/pts ${rootfs_mpoint}/dev
+    rootfs_mpoint=${rootfs_mpoint} chroot_cmd=/opt/compulab/init.d/05-boot.sh issue_chroot
+}
+
+_initrd_update() {
+    chmod a+x ${rootfs_mpoint}/opt/compulab/update_initrd.sh
+    rootfs_mpoint=${rootfs_mpoint} chroot_cmd=/opt/compulab/update_initrd.sh issue_chroot
+}
+
+_rootfs_apt() {
+    [[ -n "$@" ]] || return 0
+    local chroot_apt_cmd=/tmp/apt.sh
+cat << eof | tee &>/dev/null ${rootfs_mpoint}/${chroot_apt_cmd}
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get install --yes $@
+eof
+    chmod a+x ${rootfs_mpoint}/${chroot_apt_cmd}
+    rootfs_mpoint=${rootfs_mpoint} chroot_cmd=${chroot_apt_cmd} issue_chroot
+    rm -rf ${rootfs_mpoint}/${chroot_apt_cmd}
+}
+
+declare -A partname_to_enc_volume_name=(['ROOTFS']='root')
+_create_enc_volume() {
+    [[ -n ${part_name:-""} ]] || return 22
+
+    local volume_part=$(get_partition_by_name ${part_name})
+
+    if [[ -z ${volume_part:-""} ]];then
+        echo "No partition for ${part_name}; error  ..."
+        return 22
+     fi
+
+    local volume_name=${partname_to_enc_volume_name[${part_name}]:-${part_name}}
+
+    dd if=/dev/urandom of=${tmp_root}/etc/keys/${volume_name}.key bs=1 count=4096
+    echo "YES" | cryptsetup -c aes-xts-plain64 -s 512 -y luksFormat ${volume_part} ${tmp_root}/etc/keys/${volume_name}.key
+
+    cryptsetup luksOpen -d ${tmp_root}/etc/keys/${volume_name}.key ${volume_part} ${volume_name}
+
+    # Deploy partclone image if exists; mkfs if does not
+    local part_number=$(cat /sys/class/block/$(basename ${volume_part})/partition)
+    local image=$(ls ${src_dir}/part${part_number}.*)
+
+    if [[ -z ${image:-""} ]];then
+        mkfs.ext4 -L ${volume_name} /dev/mapper/${volume_name}
+    else
+        partclone.restore -C -d -s ${image} -o /dev/mapper/${volume_name}
+    fi
+
+    cryptsetup luksClose ${volume_name} || true
+
+    unset ID_FS_UUID
+    eval $(udevadm info -x --query=property ${volume_part})
+# Update the crypttab file with the encrypted volume info
+cat << eof | tee -a ${tmp_root}/etc/crypttab
+${volume_name} UUID=${ID_FS_UUID} /etc/keys/${volume_name}.key luks,initramfs
+eof
+}
+
+_system_enc() {
+    # prepare tmp rootfs stuff
+    export tmp_root=$(mktemp --directory)
+    cp -a ${rootfs_dir}/* ${tmp_root}
+    part_name="ROOTFS" _create_enc_volume
 }
 
 _inst_fini0() {
-    local rootfs_part=$(get_partition_by_name ROOTFS)
+    local part_name='ROOTFS'
+    local rootfs_part=$(get_partition_by_name ${part_name})
+    local volume_close="true"
+    local rootfs_append=""
+
+    unset ID_FS_TYPE
+    eval $(udevadm info -x --query=property ${rootfs_part})
+    if [[ ${ID_FS_TYPE:-""} = "crypto_LUKS" ]];then
+        local volume_name=${partname_to_enc_volume_name[${part_name}]:-${part_name}}
+        cryptsetup luksOpen -d ${tmp_root}/etc/keys/${volume_name}.key ${rootfs_part} ${volume_name}
+        volume_close="cryptsetup luksClose ${volume_name}"
+        rootfs_part=/dev/mapper/${volume_name}
+        rootfs_append="cryptdevice=UUID=${ID_FS_UUID}:root root=/dev/mapper/root"
+    fi
+
     local rootfs_mpoint=$(mktemp --directory)
     mount ${rootfs_part} ${rootfs_mpoint}
 
+    # Install required packages
+    rootfs_mpoint=${rootfs_mpoint} _rootfs_apt cryptsetup-initramfs
+
     # Update boot configuration on the original rootfs
     rootfs_mpoint=${rootfs_mpoint} _extlinux_update
+
+    # Update root device if required
+    if [[ -n ${rootfs_append:-""} ]];then
+        local extlinux_conf_file=${rootfs_mpoint}/boot/extlinux/extlinux.conf
+        cp ${extlinux_conf_file} ${extlinux_conf_file}.0riginal
+        sed -i "s|root=[^[:space:]]*[[:space:]]|${rootfs_append} |g" ${extlinux_conf_file}
+        tar -C ${tmp_root} -cf - . | tar -C ${rootfs_mpoint} -xf -
+    fi
+
+    # Update initrd
+    rootfs_mpoint=${rootfs_mpoint} _initrd_update
 
     # Prepare APP partition for boot files only
     local app_part=$(get_partition_by_name APP)
@@ -151,10 +236,11 @@ _inst_fini0() {
     # Copy rootfs/boot to <boot-partition>/
     cp -a ${rootfs_mpoint}/boot ${app_mpoint}/
     umount ${app_mpoint} ${rootfs_mpoint}
+    ${volume_close}
 }
 
 inst_fini() {
+    _system_enc
     _inst_fini0
     _inst_fini1
-
 }
