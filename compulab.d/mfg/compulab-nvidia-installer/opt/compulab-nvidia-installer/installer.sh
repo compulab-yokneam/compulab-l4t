@@ -8,6 +8,7 @@ rootfs_dir=${work_dir}/data/rootfs.d
 source ${work_dir}/installer.env
 source ${work_dir}/installer.inc
 source ${work_dir}/installer.lay
+source ${tools_dir}/restore.partclone.inc
 
 choose_device_func() {
 	local select_string=$(get_install_devices)" Exit"
@@ -77,7 +78,8 @@ installer_func() {
 
 	${layout}
 	inst_init
-	src=${src_dir} device=${device} ${tools_dir}/restore.partclone.sh
+	src=${src_dir} device=${device} apply_layout_func
+	src=${src_dir} device=${device} restore_partclone_func
 	inst_fini
 
 	[[ $? -eq 0 ]] && figlet "Done: OKAY" || figlet "Failed"
