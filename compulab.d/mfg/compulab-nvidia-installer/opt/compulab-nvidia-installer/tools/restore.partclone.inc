@@ -10,7 +10,7 @@ function apply_layout_func() {
 
     # Create layout { begin }
     cat ${src}/disk.layout | sfdisk ${device}
-    echo "w" | fdisk ${device}
+    echo "w" | fdisk ${device} || true
     sleep 1
     # Create layout { end }
 
@@ -30,49 +30,53 @@ function restore_partclone_func() {
     local last_part_num=$(cat  /sys/class/block/$(basename ${part_dev})/partition)
     # Get last partition number { end }
 
-    for _wait in $(seq 1 3);do
-        echo -n $_wait" "; sleep 1
-    done
-
     for _device in ${device}*;do
-        eval $(blkid ${_device} | awk -F":" '($0="dev="$1" "$2)';)
-        local _dev=$(basename ${dev})
+        eval $(blkid ${_device} | awk -F":" '($0=$2)';)
+
+        if [[ ${PARTLABEL:-""} = "swap" ]];then
+            mkswap --label "swap" ${_device}
+            continue
+        fi
+
+        # Get the target device: partition or the encrypted volume
+        local pc_dest_device=$(device=${_device} open_device)
+        #
+
+        local _dev=$(basename ${_device})
         [[ -f /sys/class/block/${_dev}/partition ]] || continue
         local num=$(cat /sys/class/block/${_dev}/partition)
         local image=$(ls ${src}/part${num}.* 2>/dev/null || true)
-        if [[ -z ${image:-""} ]];then
-            echo "No image file for part # ${num}; skip 'n' continue ..."
-            continue
+
+        if [[ -n ${image:-""} ]];then
+            # get part type and uuid from the image name { begin }
+            local name=$(basename ${image}); name=(${name//./ })
+            local type=${name[1]} uuid=${name[2]}
+            # get part type and uuid from the image name { end }
+
+
+            [[ ${type} = dd ]] && pc_command="partclone.dd" || pc_command="partclone.restore -C "
+            local _file_type=$(file ${image} | awk '$0=tolower($2)')
+            local _command=${i_command[${_file_type}]:-"dd if="}
+cat << eof
+            ${_command}${image} | ${pc_command} -d -s - -o ${pc_dest_device} && rc=$? || rc=$?
+eof
+            if [[ ${rc} -ne 0 ]];then
+                echo "Error: deployment ( ${image} -> ${pc_dest_device} )  error=${rc}"
+                return ${rc}
+            fi
+        else
+            echo "No image file case ${pc_dest_device} ..."
+            mkfs.ext4 -F -L ${PARTLABEL} ${pc_dest_device}
         fi
-        # get part type and uuid from the image name { begin }
-        local name=$(basename ${image}); name=(${name//./ })
-        local type=${name[1]} uuid=${name[2]}
-        # get part type and uuid from the image name { end }
-        if [[ ${type} = swap ]];then
-            # Create a swap partition { begin }
-            mkswap ${_device} --uuid ${uuid}
-            continue
-            # Create a swap partition { end }
-        fi
-        [[ ${type} = dd ]] && pc_command="partclone.dd" || pc_command="partclone.restore -C "
-        local _file_type=$(file ${image} | awk '$0=tolower($2)')
-        local _command=${i_command[${_file_type}]:-"dd if="}
-# cat << eof
-        ${_command}${image} | ${pc_command} -d -s - -o ${_device} && rc=$? || rc=$?
-# eof
-        if [[ ${rc} -ne 0 ]];then
-            echo "Error: deployment ( ${image} -> ${_device} )  error=${rc}"
-            return ${rc}
-        fi
-	# Expand las part if yes
-	[[ ${expand_last_part:-""} = 'yes' ]] || continue
+        device=${_device} close_device
+
+        # Expand las part if yes
+        [[ ${expand_last_part:-""} = 'yes' ]] || continue
         if [[ ${last_part_num} = ${num} ]];then
-    	    parted -s ${device} resizepart ${last_part_num} 100%
+            parted -s ${device} resizepart ${last_part_num} 100%
             e2fsck -f ${_device} || true
             resize2fs ${_device} || true
         fi
     done
     return 0
 }
-
-# src=${src} device=${device} restore_partclone_func
