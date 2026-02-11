@@ -88,3 +88,35 @@ issue_chroot() {
     chroot ${rootfs_mpoint} "${chroot_cmd}"
     umount ${rootfs_mpoint}/etc/resolv.conf ${rootfs_mpoint}/proc ${rootfs_mpoint}/sys ${rootfs_mpoint}/dev/pts ${rootfs_mpoint}/dev
 }
+
+open_close_device() {
+
+    command -v __${sys_call}_enc_volume >/dev/null || {
+        echo ${device}
+        return 0
+    }
+
+    unset TYPE PARTLABEL
+    eval $(blkid ${device} | awk -F":" '$0=$2')
+    if [[ ${TYPE} = "crypto_LUKS" ]];then
+        part_name=${PARTLABEL} __${sys_call}_enc_volume && rc=$? || rc=$?
+        if [[ ${rc} -eq 0 ]];then
+            echo "/dev/mapper/${PARTLABEL}"
+            return 0
+        fi
+        return 22
+    fi
+    echo ${device}
+    return 0
+}
+
+open_device() {
+    local device_name=$(device=${device} sys_call="open" open_close_device)
+    echo ${device_name}
+    return 0
+}
+
+close_device() {
+    local device_name=$(device=${device} sys_call="close" open_close_device)
+    return 0
+}
