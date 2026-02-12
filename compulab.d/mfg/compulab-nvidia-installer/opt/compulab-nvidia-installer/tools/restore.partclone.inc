@@ -57,9 +57,7 @@ function restore_partclone_func() {
             [[ ${type} = dd ]] && pc_command="partclone.dd" || pc_command="partclone.restore -C "
             local _file_type=$(file ${image} | awk '$0=tolower($2)')
             local _command=${i_command[${_file_type}]:-"dd if="}
-cat << eof
             ${_command}${image} | ${pc_command} -d -s - -o ${pc_dest_device} && rc=$? || rc=$?
-eof
             if [[ ${rc} -ne 0 ]];then
                 echo "Error: deployment ( ${image} -> ${pc_dest_device} )  error=${rc}"
                 return ${rc}
