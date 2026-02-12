@@ -1,0 +1,73 @@
+enc_volume_list="root storage"
+
+export tmp_root=$(mktemp --directory)
+
+__system_enc_init() {
+    cp -a ${rootfs_dir}/* ${tmp_root}
+    chown -R root:root ${tmp_root}
+    chmod 0755 ${tmp_root}
+    for part_name in ${enc_volume_list};do
+        local volume_part=$(get_partition_by_name ${part_name})
+        [[ -z ${volume_part:-""} ]] && continue || true
+        part_name=${part_name} __create_enc_volume
+    done
+}
+
+__system_enc_fini() {
+    for part_name in ${enc_volume_list};do
+        local volume_part=$(get_partition_by_name ${part_name})
+        [[ -z ${volume_part:-""} ]] && continue || true
+
+        unset ID_FS_UUID
+        eval $(udevadm info -x --query=property ${volume_part})
+        # Update the crypttab file with the encrypted volume info
+        echo "${part_name} UUID=${ID_FS_UUID} /etc/keys/${part_name}.key luks,initramfs" | tee -a ${tmp_root}/etc/crypttab 
+
+    done
+}
+
+__create_enc_volume() {
+    [[ -n ${part_name:-""} ]] || return 22
+
+    local volume_part=$(get_partition_by_name ${part_name})
+
+    if [[ -z ${volume_part:-""} ]];then
+        echo "No partition for ${part_name}; error  ..."
+        return 22
+     fi
+
+    local volume_name=${partname_to_enc_volume_name[${part_name}]:-${part_name}}
+
+    dd if=/dev/urandom of=${tmp_root}/etc/keys/${volume_name}.key bs=1 count=4096
+    echo "YES" | cryptsetup -c aes-xts-plain64 -s 512 -y luksFormat ${volume_part} ${tmp_root}/etc/keys/${volume_name}.key
+}
+
+__open_enc_volume() {
+    [[ -n ${part_name:-""} ]] || return 22
+
+    local volume_part=$(get_partition_by_name ${part_name})
+
+    if [[ -z ${volume_part:-""} ]];then
+        echo "No partition for ${part_name}; error  ..."
+        return 22
+     fi
+
+    local volume_name=${partname_to_enc_volume_name[${part_name}]:-${part_name}}
+
+    cryptsetup luksOpen -d ${tmp_root}/etc/keys/${volume_name}.key ${volume_part} ${volume_name}
+}
+
+__close_enc_volume() {
+    [[ -n ${part_name:-""} ]] || return 22
+
+    local volume_part=$(get_partition_by_name ${part_name})
+
+    if [[ -z ${volume_part:-""} ]];then
+        echo "No partition for ${part_name}; error  ..."
+        return 22
+     fi
+
+    local volume_name=${partname_to_enc_volume_name[${part_name}]:-${part_name}}
+
+    cryptsetup luksClose ${volume_name} || true
+}
