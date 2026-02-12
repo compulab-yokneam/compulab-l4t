@@ -50,6 +50,7 @@ eof
 installer_func() {
     local select_string=""
     local layout=""
+    local encrypt=""
 
     for _layout in $(for __layout in ${!layout_array[@]};do echo ${__layout}; done | sort -u);do
         layout_id=${_layout}
@@ -72,6 +73,23 @@ installer_func() {
         done
     done
 
+    select_string="Yes No Exit"
+    PS3="Issue encryption > "
+    while [ -z ${encrypt:-""} ];do
+        select j in ${select_string}; do
+            case ${j} in
+                "Exit")
+                exit 0
+                ;;
+                *)
+                encrypt=${j}
+                break
+                ;;
+            esac
+        done
+    done
+
+    [[ ${encrypt} = "Yes" ]] && source ${work_dir}/installer.enc
     # Get the layout func from the select string
     layout=(${layout/--/ })
     layout=${layout[0]}
@@ -79,7 +97,10 @@ installer_func() {
     ${layout}
     inst_init
     src=${src_dir} device=${device} apply_layout_func
+    _update_layout
+    [[ ${encrypt} = "Yes" ]] && __system_enc_init
     src=${src_dir} device=${device} restore_partclone_func
+    [[ ${encrypt} = "Yes" ]] && __system_enc_fini
     inst_fini
 
     [[ $? -eq 0 ]] && figlet "Done: OKAY" || figlet "Failed"
