@@ -8,6 +8,8 @@ get_partition_by_name() {
     blkid ${device}* | awk -v name=${1} -F":" '{ if ($0 ~ name) { print $1 } }'
 }
 
+# expand partition, but not its contant
+# there can be a non-filesystem stuff
 expand_partition() {
     local part=${part:-""}
 
@@ -18,10 +20,7 @@ expand_partition() {
     local number=$(cat /sys/class/block/$(basename ${part})/partition)
     parted -s ${disk} resizepart ${number} 100%
     wait 1
-        e2fsck -f ${part}
-    wait 1
-        resize2fs ${part}
-    wait 1
+    return 0
 }
 
 get_disk_by_partition() {
