@@ -1,4 +1,6 @@
-enc_volume_list="root storage"
+keys_dir=${rootfs_dir}/etc/keys
+enc_volume_list_del="root,storage"
+enc_volume_list=${enc_volume_list_del//,/ }
 
 export tmp_root=$(mktemp --directory)
 
@@ -74,3 +76,41 @@ close_enc_volume() {
 
     cryptsetup luksClose ${volume_name} || true
 }
+
+enc_help() {
+cat << eof
+	Help
+	-
+	The CompuLab Nvidia installer can encrypt these volumes: ${enc_volume_list_del}
+	Each encrypted volume must have its own key-phrase-file <volume_name>.key
+	in ${keys_dir} folder:
+eof
+	for _vol in ${enc_volume_list};do
+		_msg="${_vol}: ${keys_dir}/${_vol}.key"
+cat << eof
+		${_msg}
+eof
+	done
+cat << eof
+
+	Create key files before running the installer.
+	-
+	If the volume key-phrase-file does not exist,
+	then the installer creates a default file with the key phrase: <volume_name>_enc_volume.
+	-
+	Current status:
+eof
+	for _vol in ${enc_volume_list};do
+		if [[ -f ${keys_dir}/${_vol}.key ]];then
+			_msg="${_vol}: key-phrase-file [ ${keys_dir}/${_vol}.key ]"
+		else
+			_msg="${_vol}: key-phrase [ ${_vol}_enc_volume ]"
+		fi
+cat << eof
+		${_msg}
+eof
+	done
+}
+
+enc_help
+read -p "Press any key to continue; Crtl^C to exit ...."
