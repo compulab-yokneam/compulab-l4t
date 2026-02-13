@@ -38,7 +38,10 @@ __create_enc_volume() {
 
     local volume_name=${partname_to_enc_volume_name[${part_name}]:-${part_name}}
 
-    dd if=/dev/urandom of=${tmp_root}/etc/keys/${volume_name}.key bs=1 count=4096
+    if [[ ! -f ${tmp_root}/etc/keys/${volume_name}.key ]];then
+        echo -n "${volume_name}_enc_volume" > ${tmp_root}/etc/keys/${volume_name}.key
+    fi
+    chmod 0400 ${tmp_root}/etc/keys/${volume_name}.key
     echo "YES" | cryptsetup -c aes-xts-plain64 -s 512 -y luksFormat ${volume_part} ${tmp_root}/etc/keys/${volume_name}.key
 }
 
