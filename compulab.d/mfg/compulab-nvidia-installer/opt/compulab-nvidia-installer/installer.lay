@@ -143,6 +143,8 @@ _inst_fini() {
     # Update boot configuration on the original rootfs
     rootfs_mpoint=${rootfs_mpoint} _extlinux_update
 
+    rootfs_mpoint=${rootfs_mpoint} _rootfs_update
+
     # crypto_LUKS flow
     unset ID_FS_TYPE
     eval $(udevadm info -x --query=property ${root_partition})
@@ -178,6 +180,14 @@ _inst_fini() {
 
     device=${root_partition} close_device
     rm -rf ${rootfs_mpoint} ${app_mpoint}
+}
+
+_rootfs_update() {
+    [[ -f ${tmp_root}/chroot_update.d/run.me ]] || return
+    cp ${tmp_root}/chroot_update.d/run.me ${rootfs_mpoint}/tmp/run.me
+    chmod a+x ${rootfs_mpoint}/tmp/run.me
+    rootfs_mpoint=${rootfs_mpoint} chroot_cmd=/tmp/run.me issue_chroot
+    rm -rf ${rootfs_mpoint}/tmp/run.me
 }
 
 _extlinux_update() {
