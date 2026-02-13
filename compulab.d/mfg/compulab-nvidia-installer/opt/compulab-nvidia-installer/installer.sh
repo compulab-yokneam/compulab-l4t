@@ -98,9 +98,9 @@ installer_func() {
     inst_init
     src=${src_dir} device=${device} apply_layout_func
     _update_layout
-    [[ ${encrypt} = "Yes" ]] && __system_enc_init
+    [[ ${encrypt} = "Yes" ]] && system_enc_init
     src=${src_dir} device=${device} restore_partclone_func
-    [[ ${encrypt} = "Yes" ]] && __system_enc_fini
+    [[ ${encrypt} = "Yes" ]] && system_enc_fini
     inst_fini
 
     [[ $? -eq 0 ]] && figlet "Done: OKAY" || figlet "Failed"

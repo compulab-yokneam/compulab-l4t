@@ -90,7 +90,7 @@ issue_chroot() {
 
 open_close_device() {
 
-    command -v __${sys_call}_enc_volume >/dev/null || {
+    command -v ${sys_call}_enc_volume >/dev/null || {
         echo ${device}
         return 0
     }
@@ -98,7 +98,7 @@ open_close_device() {
     unset TYPE PARTLABEL
     eval $(blkid ${device} | awk -F":" '$0=$2')
     if [[ ${TYPE} = "crypto_LUKS" ]];then
-        part_name=${PARTLABEL} __${sys_call}_enc_volume && rc=$? || rc=$?
+        part_name=${PARTLABEL} ${sys_call}_enc_volume && rc=$? || rc=$?
         if [[ ${rc} -eq 0 ]];then
             echo "/dev/mapper/${PARTLABEL}"
             return 0

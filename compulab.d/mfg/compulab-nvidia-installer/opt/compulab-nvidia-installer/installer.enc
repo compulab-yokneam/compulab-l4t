@@ -2,18 +2,18 @@ enc_volume_list="root storage"
 
 export tmp_root=$(mktemp --directory)
 
-__system_enc_init() {
+system_enc_init() {
     cp -a ${rootfs_dir}/* ${tmp_root}
     chown -R root:root ${tmp_root}
     chmod 0755 ${tmp_root}
     for part_name in ${enc_volume_list};do
         local volume_part=$(get_partition_by_name ${part_name})
         [[ -z ${volume_part:-""} ]] && continue || true
-        part_name=${part_name} __create_enc_volume
+        part_name=${part_name} create_enc_volume
     done
 }
 
-__system_enc_fini() {
+system_enc_fini() {
     for part_name in ${enc_volume_list};do
         local volume_part=$(get_partition_by_name ${part_name})
         [[ -z ${volume_part:-""} ]] && continue || true
@@ -26,7 +26,7 @@ __system_enc_fini() {
     done
 }
 
-__create_enc_volume() {
+create_enc_volume() {
     [[ -n ${part_name:-""} ]] || return 22
 
     local volume_part=$(get_partition_by_name ${part_name})
@@ -45,7 +45,7 @@ __create_enc_volume() {
     echo "YES" | cryptsetup -c aes-xts-plain64 -s 512 -y luksFormat ${volume_part} ${tmp_root}/etc/keys/${volume_name}.key
 }
 
-__open_enc_volume() {
+open_enc_volume() {
     [[ -n ${part_name:-""} ]] || return 22
 
     local volume_part=$(get_partition_by_name ${part_name})
@@ -60,7 +60,7 @@ __open_enc_volume() {
     cryptsetup luksOpen -d ${tmp_root}/etc/keys/${volume_name}.key ${volume_part} ${volume_name}
 }
 
-__close_enc_volume() {
+close_enc_volume() {
     [[ -n ${part_name:-""} ]] || return 22
 
     local volume_part=$(get_partition_by_name ${part_name})
