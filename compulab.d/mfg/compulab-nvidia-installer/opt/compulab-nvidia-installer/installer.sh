@@ -97,7 +97,6 @@ installer_func() {
     ${layout}
     inst_init
     src=${src_dir} device=${device} apply_layout_func
-    _update_layout
     [[ ${encrypt} = "Yes" ]] && system_enc_init
     src=${src_dir} device=${device} restore_partclone_func
     [[ ${encrypt} = "Yes" ]] && system_enc_fini

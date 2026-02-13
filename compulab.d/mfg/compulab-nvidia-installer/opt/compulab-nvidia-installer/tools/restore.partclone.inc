@@ -18,6 +18,10 @@ function apply_layout_func() {
     [[ ! -f ${src}/disk.id ]] && sfdisk --disk-id ${device} $(cat ${src}/disk.id)
     # Restore disk-id UUID if possible { end }
 
+    # Issue _update_layout() if exists;
+    # this func gets defined by a layout_number()
+    command -v _update_layout &>/dev/null && _update_layout
+
     return 0
 }
 
