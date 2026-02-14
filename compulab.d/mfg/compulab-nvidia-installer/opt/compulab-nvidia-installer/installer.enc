@@ -25,7 +25,15 @@ system_enc_fini() {
         # Update the crypttab file with the encrypted volume info
         echo "${part_name} UUID=${ID_FS_UUID} /etc/keys/${part_name}.key luks,initramfs" | tee -a ${tmp_root}/etc/crypttab 
 
+	# Create an open/close file for each volume
+	mkdir -p ${inst_info}/volumes
+	local _volume_op_file=${inst_info}/volumes/${part_name}
+	echo "cryptsetup luksOpen -d ${inst_info}/etc/keys/${part_name}.key ${volume_part} ${part_name}" | tee &>/dev/null ${_volume_op_file}.open
+	echo "cryptsetup luksClose ${part_name}" | tee &>/dev/null ${_volume_op_file}.close
+	chmod a+x ${_volume_op_file}.*
+
     done
+    tar -C ${tmp_root} -cf - etc/crypttab etc/keys | tar -C ${inst_info} -xf -
 }
 
 create_enc_volume() {

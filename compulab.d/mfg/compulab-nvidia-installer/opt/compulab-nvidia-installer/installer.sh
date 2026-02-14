@@ -4,6 +4,10 @@ work_dir=$(readlink -e $(dirname ${BASH_SOURCE[0]}))
 tools_dir=${work_dir}/tools
 src_dir=${work_dir}/data/images.d/01
 rootfs_dir=${work_dir}/data/rootfs.d
+#
+export inst_info=/tmp/install.$(date +%Y_%m_%d-%T | tr  ":" "_")
+mkdir -p ${inst_info}
+#
 
 source ${work_dir}/installer.env
 source ${work_dir}/installer.inc
@@ -95,6 +99,19 @@ installer_func() {
     layout=${layout[0]}
 
     ${layout}
+
+	[[ ${_APP_SIZE} -eq 0 ]] && rootfs_szie="To the end of the media" || rootfs_szie="${_APP_SIZE}GB"
+cat << eof | tee ${inst_info}/inst.manifest
+	Installation parameters:
+	-
+		Device: ${device}
+		Layout: ${layout}
+		Encryption: ${encrypt}
+		Rootfs size: ${rootfs_szie}
+	-
+eof
+read -p "Press any key to continue; Crtl^C to exit ...."
+
     inst_init
     src=${src_dir} device=${device} apply_layout_func
     [[ ${encrypt} = "Yes" ]] && system_enc_init
