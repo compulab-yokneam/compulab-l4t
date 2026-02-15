@@ -30,7 +30,7 @@ eof
 	for _fw in ${IWLWIF_FW};do
 		${DR} stat -c %F:%n $(dirname ${IWLWIFI_DIR})/${_fw}
 	done
-
+	apt-mark unhold linux-firmware
 }
 
 main_in() {
@@ -43,6 +43,7 @@ eof
 		${DR} ln -s $(basename ${IWLWIFI_DIR})/${_fw} $(dirname ${IWLWIFI_DIR})/${_fw}
 		${DR} stat -c %F:%n $(dirname ${IWLWIFI_DIR})/${_fw}
 	done
+	apt-mark hold linux-firmware
 }
 
 
