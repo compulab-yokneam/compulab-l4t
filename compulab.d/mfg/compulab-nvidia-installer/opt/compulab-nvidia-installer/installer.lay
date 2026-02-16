@@ -183,8 +183,8 @@ _inst_fini() {
 }
 
 _rootfs_update() {
-    [[ -f ${tmp_root}/chroot_update.d/run.me ]] || return
-    cp ${tmp_root}/chroot_update.d/run.me ${rootfs_mpoint}/tmp/run.me
+    [[ -f ${rootfs_dir}/chroot_update.d/run.me ]] || return 0
+    cp ${rootfs_dir}/chroot_update.d/run.me ${rootfs_mpoint}/tmp/run.me
     chmod a+x ${rootfs_mpoint}/tmp/run.me
     rootfs_mpoint=${rootfs_mpoint} chroot_cmd=/tmp/run.me issue_chroot
     rm -rf ${rootfs_mpoint}/tmp/run.me
