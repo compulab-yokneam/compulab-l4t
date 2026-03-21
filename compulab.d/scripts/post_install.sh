@@ -33,7 +33,13 @@ update_system_services() {
     done
 }
 
+prevent_fw_update() {
+    local key_file="/opt/nvidia/l4t-packages/.nv-l4t-disable-boot-fw-update-in-preinstall"
+    mkdir -p $(dirname ${key_file}) && touch ${key_file}
+}
+
 nv-update-initrd
 [[ "${COMPULAB_VERSION}" = "${NVIDIA_VERSION}" ]] || update_boot_files
 update_boot_config_bootargs
 update_system_services
+prevent_fw_update
